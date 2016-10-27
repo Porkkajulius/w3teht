@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html ng-app="app">
+<head>
+    <title><%= title %></title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+</head>
+<body>
+<h1><%= title %></h1>
+
+<ng-view></ng-view>
+
+<!-- Kirjastot -->
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-route.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-resource.min.js"></script>
+
+<!-- Template -->
+<script type="text/ng-template" id="/elokuvat.html">
+    Etsi: <input type="text" ng-model="etsi.nimi">
+    <ul>
+
+
+        <li ng-repeat="elokuva in elokuvat | filter: etsi">
+
+            <a ng-show="!editing[$index]" href="#/{{elokuva._id}}">{{elokuva.nimi}}</a>
+            <button ng-show="!editing[$index]" ng-click="edit($index)">Muokkaa</button>
+
+            <input ng-show="editing[$index]" type="text" ng-model="elokuva.nimi">
+            <button ng-show="editing[$index]" ng-click="update($index)">Päivitä</button>
+            <button ng-show="editing[$index]" ng-click="cancel($index)">Peruuta</button>
+            <button ng-show="!editing[$index]" ng-click="remove($index)">Poista</button>
+        </li>
+    </ul>
+    Uusi elokuva <input type="text" ng-model="newElokuva"><button ng-click="save()">Lisää</button>
+</script>
+
+<script type="text/ng-template" id="/elokuvaDetails.html">
+    <h1>{{ elokuva.nimi }}</h1>
+
+    Kommentoi elokuvaa: <textarea ng-model="elokuva.kommentti"></textarea><br><br>
+
+    <button ng-click="update()">Tallenna kommentti</button>
+    <button ng-click="remove()">Poista elokuva</button>
+    <a href="/">Peruuta</a>
+</script>
+
+
+<script>
+    angular.module('app', ['ngRoute', 'ngResource'])
+
+    //---------------
+    // Service
+    //---------------
+
+            .factory('Elokuvat', ['$resource', function($resource){
+                return $resource('/elokuvat/:id', null, {
+                    'update': { method:'PUT' }
+                });
+            }])
+
+            //---------------
+            // Controllerit
+            //---------------
+
+            .controller('ElokuvaController', ['$scope', 'Elokuvat', function ($scope, Elokuvat) {
+                $scope.editing = [];
+                $scope.elokuvat = Elokuvat.query();
+
+                $scope.save = function(){
+                    if(!$scope.newElokuva || $scope.newElokuva.length < 1) return;
+                    var elokuva = new Elokuvat({ nimi: $scope.newElokuva, completed: false });
+
+                    elokuva.$save(function(){
+                        $scope.elokuvat.push(elokuva);
+                        $scope.newElokuva = ''; // clear textbox
+                    });
+                }
+
+                $scope.update = function(index){
+                    var elokuva = $scope.elokuvat[index];
+                    Elokuvat.update({id: elokuva._id}, elokuva);
+                    $scope.editing[index] = false;
+                }
+
+                $scope.edit = function(index){
+                    $scope.editing[index] = angular.copy($scope.elokuvat[index]);
+                }
+
+                $scope.cancel = function(index){
+                    $scope.elokuvat[index] = angular.copy($scope.editing[index]);
+                    $scope.editing[index] = false;
+                }
+
+                $scope.remove = function(index){
+                    var elokuva = $scope.elokuvat[index];
+                    Elokuvat.remove({id: elokuva._id}, function(){
+                        $scope.elokuvat.splice(index, 1);
+                    });
+                }
+            }])
+
+
+            .controller('ElokuvaDetailCtrl', ['$scope', '$routeParams', 'Elokuvat', '$location', function ($scope, $routeParams, Elokuvat, $location) {
+                $scope.elokuva = Elokuvat.get({id: $routeParams.id });
+
+                $scope.remove = function(){
+                    Elokuvat.remove({id: $scope.elokuva._id}, function(){
+                        $location.url('/');
+                    });
+                }
+            }])
+
+            //---------------
+            // Reitit (routes)
+            //---------------
+
+            .config(['$routeProvider', function ($routeProvider) {
+                $routeProvider
+                        .when('/', {
+                            templateUrl: '/elokuvat.html',
+                            controller: 'ElokuvaController'
+                        })
+
+                        .when('/:id', {
+                            templateUrl: '/elokuvaDetails.html',
+                            controller: 'ElokuvaDetailCtrl'
+                        });
+            }]);
+</script>
+</body>
+</html>
